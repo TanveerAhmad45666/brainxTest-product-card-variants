@@ -1,0 +1,168 @@
+{%- unless skip_styles -%}
+  <link rel="stylesheet" href="{{ 'component-rating.css' | asset_url }}">
+  <link rel="stylesheet" href="{{ 'component-volume-pricing.css' | asset_url }}">
+  <link rel="stylesheet" href="{{ 'quick-order-list.css' | asset_url }}">
+  <link rel="stylesheet" href="{{ 'quantity-popover.css' | asset_url }}">
+{%- endunless -%}
+
+{%- if card_product and card_product != empty -%}
+  <div class="product-cart" id="product-{{ card_product.id }}">
+    <div class="product-image">
+      <img id="product-image-{{ card_product.id }}" src="{{ card_product.featured_media | img_url: 'medium' }}" alt="{{ card_product.featured_media.alt | escape }}">
+    </div>
+    <div class="product-content">
+      <h3 class="producttitle">
+        <a href="{{ card_product.url }}">{{ card_product.title | escape }}</a>
+      </h3>
+      <div class="productvariant">
+        <!-- Size Selector -->
+        {% assign size_options = card_product.options_with_values[1] %}
+        <label>Select Size:<span id="selected-size-{{ card_product.id }}"></span></label>
+        <div class="size-options">
+          {% for value in size_options.values %}
+            <button type="button" data-value="{{ value }}" class="size-btn">{{ value }}</button>
+          {% endfor %}
+        </div>
+
+        <!-- Color Selector -->
+        {% assign color_options = card_product.options_with_values[0] %}
+        <label>Select Color:<span id="selected-color-{{ card_product.id }}"></span></label>
+        <div class="color-options">
+          {% for value in color_options.values %}
+            {% assign variant = card_product.variants | where: 'option1', value | first %}
+            <button type="button" data-value="{{ value }}" class="color-btn">
+              {% if variant.featured_image %}
+                <img src="{{ variant.featured_image.src | img_url: 'small' }}" alt="{{ value }}">
+              {% else %}
+                {{ value }}
+              {% endif %}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="product-cart-button">
+      <div class="productprice">
+        <span class="price" id="product-price-{{ card_product.id }}">{{ card_product.price | money }}</span>
+      </div>
+      <form action="/cart/add" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="id" value="{{ card_product.variants.first.id }}" id="variant-id-input-{{ card_product.id }}">
+        <button type="submit" class="btn">Add to Cart</button>
+      </form>
+    </div>
+  </div>
+
+  <script id="product-variants-{{ card_product.id }}" type="application/json">
+    {{ card_product.variants | json }}
+  </script>
+{%- endif -%}
+
+<script>
+  document.querySelectorAll('.product-cart').forEach(function(product) {
+    var productId = product.id.split('-')[1];
+    var variantsElement = document.getElementById('product-variants-' + productId);
+    if (!variantsElement) {
+      console.error('Variants data not found for product ID ' + productId);
+      return;
+    }
+    
+    var variants = JSON.parse(variantsElement.textContent);
+    var selectedSize = null;
+    var selectedColor = null;
+
+
+    var initialVariant = variants[0];
+    selectedSize = initialVariant.option2;
+    selectedColor = initialVariant.option1;
+
+    updateVariant();
+    updateLabels();
+
+    function updateVariant() {
+      var matchedVariant = variants.find(function(variant) {
+        return variant.option1 === selectedColor && variant.option2 === selectedSize;
+      });
+
+      if (matchedVariant) {
+
+        document.getElementById('product-price-' + productId).textContent = new Intl.NumberFormat('en-US', {
+          style: 'currency', currency: 'USD'
+        }).format(matchedVariant.price / 100);
+
+        document.getElementById('variant-id-input-' + productId).value = matchedVariant.id;
+
+        if (matchedVariant.featured_image) {
+          var imgElement = document.getElementById('product-image-' + productId);
+          imgElement.src = matchedVariant.featured_image.src;
+          imgElement.alt = matchedVariant.featured_image.alt || '';
+        }
+      }
+    }
+
+    function updateLabels() {
+      document.getElementById('selected-size-' + productId).textContent = selectedSize || '';
+      document.getElementById('selected-color-' + productId).textContent = selectedColor || '';
+    }
+
+    product.querySelectorAll('.size-btn').forEach(function(button) {
+      button.addEventListener('click', function() {
+        selectedSize = button.getAttribute('data-value');
+        product.querySelectorAll('.size-btn').forEach(function(btn) {
+          btn.classList.remove('active');
+        });
+        button.classList.add('active');
+        updateVariant();
+        updateLabels();
+      });
+    });
+
+
+    product.querySelectorAll('.color-btn').forEach(function(button) {
+      button.addEventListener('click', function() {
+        selectedColor = button.getAttribute('data-value');
+        product.querySelectorAll('.color-btn').forEach(function(btn) {
+          btn.classList.remove('active');
+        });
+        button.classList.add('active');
+        updateVariant();
+        updateLabels();
+      });
+    });
+  });
+</script>
+
+<style>
+  .size-options button, .color-options button {
+    cursor: pointer;
+  }
+
+  .size-options button.active, .color-options button.active {
+    border-color: #000;
+    background-color: #eee;
+  }
+
+  .color-options button {
+    width: 60px;
+    border: none;
+    box-shadow: none;
+    background-color: white;
+  }
+
+  .color-options img {
+    max-width: 60px;
+    max-height: 60px;
+  }
+
+  .color-options {
+    background-color: white !important;
+  }
+
+  .size-options button {
+    background-color: white;
+    box-shadow: none;
+    padding: 6px;
+    margin: 5px 2px;
+    border: 1px solid black !important;
+    border-radius: 4px;
+  }
+</style>
